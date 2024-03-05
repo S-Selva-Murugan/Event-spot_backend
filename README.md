@@ -80,6 +80,16 @@ Backend Technologies
 
 Overall, Event Spot leverages a comprehensive set of technologies to deliver a user-friendly and feature-rich online event-finding experience.
 
-BACKEND API
+1. ![1](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/7801e4bb-a3b4-415a-99be-db7b07ed25c2)
+2. ![3](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/7ab503e5-f286-4a5a-9106-0de345a1ed05)
+3. ![4](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/6b46d528-6893-4dd0-8e3a-ad11eb89fa09)
+4. ![5](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/9e8fd30c-1d99-4563-8346-d866cfefcbf4)
+5. ![6](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/c55db0e6-0168-4865-927a-87d225623088)
+6. ![7](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/955c585d-3639-47d0-8083-eece12a6a327)
+7. ![8](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/595b79d4-7ccb-4b51-af74-f1a47cc8dc3e)
+8. ![9](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/e5c6cc7d-5c7d-40c6-a80e-8f0156ff6beb)
+9. ![10](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/b915fe37-3a16-4b21-bddd-c8f8ef52d057)
+10. ![11](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/3243d4a6-db7c-4df2-aa4a-f847f8bd1e69)
+11. ![12](https://github.com/S-Selva-Murugan/Event-spot_frontend/assets/156053728/85fc995a-b63e-4895-b797-a5dc4ab257fa)
 
 
