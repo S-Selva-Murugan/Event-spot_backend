@@ -34,5 +34,17 @@ const eventUpload = multer({
     })
 })
 
+const categotyUpload = multer({
+    storage : multers3({
+        s3 : client, 
+        bucket : "eventpot",
+        acl : "public-read",
+        contentType : multers3.AUTO_CONTENT_TYPE,
+        key : function (req,file,cb){
+            cb(null, "categoryImage/" + `${Date.now() }__${file.originalname}`)
+        }
+    })
+})
 
-module.exports={profileUpload,eventUpload}
+
+module.exports={profileUpload,eventUpload,categotyUpload}

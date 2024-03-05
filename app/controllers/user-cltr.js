@@ -4,6 +4,7 @@ const _ = require("lodash")
 const bcryptjs = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const funEmail = require("../utils/NodeMailer/email")
+const ProfileModel = require("../models/profile-model")
 
 const userCltr = {}
 
@@ -24,10 +25,20 @@ userCltr.register = async (req, res) => {
       const userCount = await UserModel.countDocuments();
 
       if (userCount === 0) {
-        user.role = "Admin";
+        user.role = "Admin"
       }
+      const profile = new ProfileModel({
+        userId:user._id
+      })
 
-      await user.save();
+      await user.save()
+      await profile.save()
+
+      await funEmail({
+        email: user.email,
+        subject: "REGISTRATION STATUS",
+        message: "YOU'R REGISTRATION IS SUCCESSFULLY PLEASE LOGIN TO ENJOY AMAZING EVENTS"
+      })
       const { username } = user
       return res.status(201).json(username);
     } catch (err) {
@@ -49,15 +60,11 @@ userCltr.login = async (req, res) => {
       if (!user) {
         return res.status(400).json({ error: "invalid email/password" })
       }
-      const result = await bcryptjs.compare(body.password, user.password)
+      const result = bcryptjs.compare(body.password, user.password)
       if (!result) {
         return res.status(400).json("invalid email/password")
       }
-      await funEmail({
-        email: user.email,
-        subject: "LOGIN STATUS",
-        message: "YOU'R LOGIN IS SUCCESSFULLY"
-      })
+
       if (user.isActive) {
         const tokenData = {
           id: user._id,
@@ -186,17 +193,26 @@ userCltr.resetPassword = async (req, res) => {
 
 
 userCltr.deactivate = async (req, res) => {
-  const { userId } = req.params; // Correctly retrieve userId from request parameters
+  const { userId } = req.params;
   try {
-    const user = await UserModel.findById(userId);
-    if (!user) return res.status(404).json({ err: "User Not Found" });
-    const userUpdate = await UserModel.findByIdAndUpdate(userId, { isActive: false }, { new: true });
-    return res.status(200).json({ message: `${user.username} account isActive changed to ${userUpdate.isActive}` });
+      const user = await UserModel.findById(userId);
+      if (!user) return res.status(404).json({ err: "User Not Found" });
+      const updatedUser = await UserModel.findByIdAndUpdate(userId, { isActive: !user.isActive }, { new: true });
+      const options = {
+        to:updatedUser.email,
+        subject:`Account Details`,
+        text:`User Account has be ${updatedUser.isActive}`
+      }
+
+      funEmail(options)
+      
+      return res.status(200).json(updatedUser);
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Internal Server Error" });
+      console.error(err);
+      return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 
 
 

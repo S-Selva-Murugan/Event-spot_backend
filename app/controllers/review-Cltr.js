@@ -1,133 +1,96 @@
-const EventModel = require("../models/event-model")
+const { validationResult } = require('express-validator');
+const EventModel = require('../models/event-model');
 const ReviewModel = require("../models/review-model")
-const { validationResult } = require("express-validator")
-const _ = require('lodash')
+const _= require('lodash')
 
-const reviewCltr = {}
-
-
-reviewCltr.create = async (req, res) => {
+// Create a review for an event
+reviewCltr = {}
+reviewCltr.createReviewForEvent = async (req, res) => {
+    const errors = validationResult(req)
+    if(!errors.isEmpty()) return res.status(400).json({errors:errors.array()})
     try {
-        // Validate request parameters
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            console.log(errors.array());
-            return res.status(400).json({ errors: errors.array() })
-        }
+        const { eventId } = req.params;
+        const { title, body, rating } = req.body;
 
-        // Get event ID from parameters
-        const eventId = req.params.eventId;
-
-        const { title, body, rating } = _.pick(req.body, ["title", "body", "rating"]);
-
-        const event = await EventModel.findById(eventId);
-        if (!event) {
-            console.error(`Event not found for ID: ${eventId}`);
-            return res.status(404).json({ error: "Event not found" });
-        }
-
-        // Check if the user has already written a review for this event
-        // const existingReview = event.reviews.find(review => review.userId === req.user.id);
-        // if (existingReview) {
-        //     return res.status(400).json({ error: "User has already written a review for this event" });
-        // }
-
-        // Create review object
-        const reviewBody = {
+        // Create a new review instance
+        const newReview = new ReviewModel({
+            eventId,
             userId: req.user.id,
             title,
-            rating,
-            body
-        };
+            body,
+            rating
+        });
 
-        // Update the event with the new review
-        event.reviews.push(reviewBody);
-        await event.save();
-
-        // Return the created review
-        res.status(201).json({ success: true, review: reviewBody });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-};
+        const savedReview = await newReview.save();
 
 
-reviewCltr.update = async (req, res) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        console.log(errors.array())
-        return res.status(400).json({ errors: errors.array() });
-    } else {
-        const eventId = req.params.eventId;
-        const userId = req.user.id;
-        const reviewId = req.params.reviewId;
-
-        const body = _.pick(req.body, ["body", "rating"]);
-
-        try {
-            const event = await EventModel.findById(eventId);
-            console.error(`Event not found for ID: ${eventId}`);
-            if (!event) return res.status(404).json("Event not found");
-
-            // Check if the user is the author of the review
-            const review = event.reviews.find(ele => ele._id.toString() === reviewId);
-            if (!review) return res.status(404).json("Review not found");
-            
-            if (review.userId.toString() !== userId) {
-                return res.status(403).json("You are not authorized to update this review");
-            }
-
-            // Update the review fields
-            review.body = body.body;
-            review.rating = body.rating;
-
-            await event.save();
-
-            res.status(200).json({ success: true, review });
-        } catch (err) {
-            console.log(err);
-            res.status(500).json({ error: "Internal Server Error" });
+        // Save the review to the database
+        const populatedReview = await ReviewModel.findById(savedReview._id).populate('userId');
+        const finalResponse={
+            reviewId:populatedReview,
+            _id:savedReview._id
         }
+
+        // Push the review ID to the event's reviews array
+        await EventModel.findByIdAndUpdate(eventId, { $push: { reviews: { reviewId: savedReview._id } } });
+        console.log(finalResponse);
+        res.status(201).json(finalResponse);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server Error' });
     }
 };
 
-reviewCltr.delete = async (req, res) => {
+
+// Update a review for an event
+reviewCltr.updateReviewForEvent = async (req, res) => {
+    const errors = validationResult(req)
+    if(!errors.isEmpty()) return res.status(400).json({errors:errors.array()})
     try {
-        const eventId = req.params.eventId;
-        const reviewId = req.params.reviewId;
-        const userId = req.user.id;
+        const { eventId, reviewId } = req.params;
+        const body = _.pick(req.body,["title","body","rating"])
 
-        // Find the event by ID
-        const event = await EventModel.findById(eventId);
-        if (!event) {
-            return res.status(404).json({ error: "Event not found" });
-        }
+        // Find the review by ID
+        const event = await EventModel.findById(eventId)
+        if(!event) res.status(404).json("Event Not Found")
 
-        // Find the review within the event
-        const review = event.reviews.find(ele => ele._id.toString() === reviewId);
-        if (!review) {
+        const reviewToUpdate = await ReviewModel.findByIdAndUpdate({_id:reviewId},body,{new:true}).populate({path:"userId",select:"_id username email"})
+
+        if (!reviewToUpdate) {
             return res.status(404).json({ error: "Review not found" });
         }
 
-        // Check if the user is the author of the review
-        if (review.userId.toString() !== userId) {
-            return res.status(403).json({ error: "You are not authorized to delete this review" });
-        }
+        // Prepare the final response
+        const finalResponse = {
+            reviewId: reviewToUpdate,
+            _id: reviewId
+        };
 
-        // Remove the review from the event
-        event.reviews = event.reviews.filter(ele => ele._id.toString() !== reviewId);
+        res.status(200).json(finalResponse);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server Error' });
+    }
+}
 
-        // Save the updated event
-        await event.save();
 
-        res.status(200).json({ success: true, message: "Review deleted successfully" });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+// Delete a review for an event
+reviewCltr.deleteReviewForEvent = async (req, res) => {
+    try {
+        const { eventId, reviewId } = req.params;
+
+        // Remove the review ID from the event's reviews array
+        await EventModel.findByIdAndUpdate(eventId, { $pull: { reviews: { reviewId } } });
+
+        // Delete the review
+        await ReviewModel.findOneAndDelete({_id:reviewId,userId:req.user.id});
+
+        res.json({ message: 'Review deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Server Error' });
     }
 };
-
 
 
 module.exports = reviewCltr

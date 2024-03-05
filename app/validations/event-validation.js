@@ -4,6 +4,7 @@ const Joi = require('joi')
 
 const schema = Joi.object({
   eventStartDateTime: Joi.date().greater(Joi.ref('ticketSaleStartTime')).required(),
+  eventEndDateTime:Joi.date().greater(Joi.ref("eventStartDateTime")).required(),
   title: Joi.string().required(),
   description: Joi.string().required(),
   venueName: Joi.string().required(),

@@ -13,7 +13,7 @@ const authenticateUser =async (req,res,next)=>{
             role:tokenData.role
         }
         const user = await UserModel.findById(req.user.id)
-        if(user.isActive){
+        if(user?.isActive){
             next()
         }else{
              res.status(403).json("You'r account is blocked by admin")

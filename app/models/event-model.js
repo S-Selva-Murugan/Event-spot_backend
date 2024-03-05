@@ -2,6 +2,7 @@ const { Schema, model } = require("mongoose");
 
 const eventSchema = new Schema({
     eventStartDateTime: Date,
+    eventEndDateTime:Date,
     title: String,
     description: String,
 
@@ -11,7 +12,7 @@ const eventSchema = new Schema({
         url: String
     },
 
-// we add the another video attribute to this
+// we can add the another video attribute to this
     posters:[{
         ClipName:String,
         image:{
@@ -59,14 +60,12 @@ const eventSchema = new Schema({
         type: Boolean,
         default: false
     },
+    
     reviews: [{
-        userId: {
-            type: Schema.Types.ObjectId,
-            ref: 'UserModel'
-        },
-        title: String,
-        body: String,
-        rating: String
+        reviewId:{
+        type: Schema.Types.ObjectId,
+        ref: 'ReviewModel'
+    }
     }],
     actors:[{
         name:String,

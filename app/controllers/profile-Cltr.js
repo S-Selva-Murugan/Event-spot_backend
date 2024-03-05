@@ -3,9 +3,13 @@ const ProfileModel = require("../models/profile-model")
 const _ = require("lodash")
 const { validationResult } = require("express-validator")
 const axios = require("axios")
-const UserModel = require("../models/user-model")
+const geolib = require('geolib')
 
-
+async function distanceBtwThem(source, dest) {
+    const distanceInMeters = geolib.getDistance(source, dest);
+    const distanceInKilometers = distanceInMeters / 1000; // Convert meters to kilometers
+    return distanceInKilometers+"km";
+}
 async function getCoByGeoCode(data,res){
     try{
     const addressResponse =await axios.get(`https://geocode.maps.co/search?q=${data}&api_key=${process.env.GEO_CODE_API_KEY}`)
@@ -62,7 +66,6 @@ profileCltr.create = async (req, res) => {
         return res.status(400).json(errors);
     }
 
-    const { profileId } = req.params;
     const body = _.pick(req.body, ["description", "address", "lonlat", "city"]);
 
     try {
@@ -105,8 +108,44 @@ profileCltr.create = async (req, res) => {
 
 
 profileCltr.getAll=async(req,res)=>{
+
+    const search = req.query.search || null
+    // console.log(search,"search")
+    const searchQuery = {username : { $regex: search,$options:"i" }}
+
+
     try{
-        const allProfile=await ProfileModel.find().populate("userId")
+        let allProfile
+        if(search){
+            let allProfileif=await ProfileModel.find().populate({
+                path:"userId",
+                match:searchQuery
+            }).sort({createdAt:-1})
+
+            // console.log("running the if")
+
+            if(allProfileif.length > 0 ){
+                const filteredProfiles = allProfileif.filter(profile => profile.userId !== null)
+                if(filteredProfiles.length > 0) allProfile = filteredProfiles
+            } 
+        }else if(search === null){
+            let allProfileElse=await ProfileModel.find().populate("userId").sort({createdAt:-1})
+            // console.log("running the else")
+            allProfile = allProfileElse
+        }
+        
+        if(allProfile?.length > 0 ){
+            const finalProfile = allProfile.filter((profile) => {
+                // console.log(req.user.id,profile.userId._id.toString(),"id")
+                return profile.userId._id.toString() !== req.user.id;
+            })
+            if(finalProfile?.length > 0) allProfile = finalProfile
+
+        }
+        
+        
+            
+
         res.status(200).json(allProfile)
     }catch(err){
         console.log(err)
@@ -115,9 +154,36 @@ profileCltr.getAll=async(req,res)=>{
 }
 
 profileCltr.getOne = async (req, res) => {
+
     try {
         // Find the profile by profileId and ensure it belongs to the authenticated user
-        const profile = await ProfileModel.findOne({ userId: req.user.id }).populate("userId").populate("bookings");
+        const profile = await ProfileModel.findOne({ userId: req.user.id })
+        .populate("userId")
+        .populate("bookings")
+        .populate(
+            {
+             path:"bookings",
+             populate:{
+             path:"eventId",
+             
+             model:"EventModel",
+             select:"_id title eventStartDateTime location" 
+            },
+            options: {
+                sort: { createdAt: -1 }
+            }
+        })
+
+        // console.log(profile," i am prfile")
+        // const newProfile = profile.
+        // for(const eventKey in profile.bookings.eventId){
+        //     console.log(eventKey.addressInfo.location,"location")
+        // }
+        const array = await Promise.all(profile.bookings.map(async(booking)=>{
+            return distanceBtwThem( profile.location.coordinates, booking.eventId.location.coordinates)
+        }))
+        console.log(array)
+
         
         if (!profile) {
             // If profile is not found or doesn't belong to the authenticated user
@@ -151,5 +217,5 @@ profileCltr.delete=async(req,res)=>{
 
 
 
-module.exports = profileCltr  
+module.exports = profileCltr
 

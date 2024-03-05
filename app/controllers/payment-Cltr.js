@@ -5,6 +5,8 @@ const stripe = require("stripe")(process.env.STRIPE_KEY);
 const _ = require("lodash");
 const PaymentModel = require("../models/payment-model");
 const ProfileModel = require("../models/profile-model");
+const {cancelBookingFunction} = require("../controllers/booking-Cltr");
+const funEmail = require("../utils/NodeMailer/email");
 
 const paymentCltr = {};
 
@@ -40,7 +42,6 @@ paymentCltr.paymentCheckoutSession = async (req, res) => {
             country: 'US', 
         },
     })
-    console.log(bookedEvent)
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: [body.card],
@@ -62,11 +63,9 @@ paymentCltr.paymentCheckoutSession = async (req, res) => {
         success_url: `${process.env.SERVER_URL}/success`,
         cancel_url: `${process.env.SERVER_URL}/cancel`,
       }); 
-      console.log(bookedEvent,"i am event")
         const totalPaidAmount = bookedEvent.tickets.reduce((acc,cv ) => {
             return acc + cv.totalAmount;
           }, 0);
-        console.log(totalPaidAmount)
         res.json({id:session.id,url:session.url})
 
         if(session.id){
@@ -91,17 +90,18 @@ paymentCltr.paymentCheckoutSession = async (req, res) => {
 
 paymentCltr.updatedPayment = async(req,res)=>{
   const {stripeId} = req.body
+  console.log(stripeId,"id 92")
   try{
     console.log("1")
     const payment = await PaymentModel.findOneAndUpdate(
       { transaction_Id: stripeId },
       { status: true },
       { new: true }
-    );
-        console.log(payment,"paymentInfo")
-    if(payment.status === true){
+    )
+ console.log(payment,"paymentInfo")
+    if(payment.status){
       console.log("2")
-      const booking = await BookingModel.findOneAndUpdate({_id:payment.bookingId},{status:true},)
+      const booking = await BookingModel.findOneAndUpdate({_id:payment.bookingId},{status:true},{new:true}).populate("eventId").populate("userId")
         console.log(booking._id,"id")
 
         const updatedProfile = await ProfileModel.findOneAndUpdate(
@@ -109,10 +109,18 @@ paymentCltr.updatedPayment = async(req,res)=>{
           { $push: { bookings: booking._id } }
         ) 
 
+        await funEmail({
+          email: booking.userId.email,
+          subject: "BOOKING CONFIRMED",
+          message: `YOU'R BOOKING IS SUCCESSFULLY ${booking.eventId.title}`
+        })
 
       res.status(200).json("Payment Successfull", booking.totalAmount,"Rs")
+    }else{
+      if(!payment) return res.status(404).json("Cannot find the Payment Info")
     }
-    if(!payment) return res.status(404).json("Cannot find the Payment Info")
+
+
 
   } catch(err){
     console.log(err)
@@ -120,56 +128,19 @@ paymentCltr.updatedPayment = async(req,res)=>{
   }
 }
 
-// paymentCltr.updatedPayment = async (req, res) => {
-//   const { transactionId } = req.body;
-//   try {
-//     console.log("1");
-//     const payment = await PaymentModel.findOneAndUpdate(
-//       { transaction_Id: transactionId },  // Updated variable name
-//       { status: true },
-//       { new: true }
-//     );
-//     console.log(payment, "paymentInfo");
-//     if (payment && payment.status === true) {
-//       console.log("2");
-//       const booking = await BookingModel.findOneAndUpdate(
-//         { _id: payment.bookingId, userId: req.user.id },
-//         { status: true }
-//       );
-//       console.log(booking);
-//       const addBooking = await ProfileModel.findOneAndUpdate(
-//         { userId: req.user.id },
-//         { $push: { bookings: booking._id } }
-//       );
-//       console.log(addBooking);
-
-//       console.log("3");
-
-//       res.status(200).json({
-//         message: "Payment Successful",
-//         totalAmount: booking.totalAmount,
-//         currency: "Rs"
-//       });
-//     } else {
-//       return res.status(404).json("Cannot find the Payment Info");
-//     }
-//   } catch (err) {
-//     return res.status(500).json("Payment failed");
-//   }
-// };
-
-
-
 paymentCltr.deletePayment  = async(req,res)=>{
   const {paymentId} = req.params
   try{
-    await PaymentModel.findOneAndDelete({userId:req.user.id,transaction_Id:paymentId})
-    return res.status(200).json("Somthing went wrong on the payment")
+    const paymentData = await PaymentModel.findOneAndDelete({userId:req.user.id,transaction_Id:paymentId},{new:true})
+    const DeleteBooking = await cancelBookingFunction(paymentData.bookingId)
+
+
+    return res.status(200).json("Your booking is Canceled")
   }catch(err){//write the status code for payments
-    return res.json(EvalError)
+    return res.status(400).json(err)
   }
 }
 
 
 
-module.exports = paymentCltr;
+module.exports = paymentCltr

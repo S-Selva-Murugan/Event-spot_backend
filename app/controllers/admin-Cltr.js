@@ -3,6 +3,8 @@ const EventModel = require("../models/event-model")
 const PaymentModel = require("../models/payment-model")
 const ProfileModel = require("../models/profile-model")
 const UserModel = require("../models/user-model")
+const BookingModel = require("../models/booking-model")
+const ReviewModel = require("../models/review-model")
 
 const adminCltr = {}
 
@@ -78,11 +80,90 @@ adminCltr.getAggregate = async (req, res) => {
                 info:0,
                 categoryEvents:0
             },
-            review:0
+            review:0,
+            totalBooking:0,
+            avgPerCat:0,
+            revenuePerUser:0,
+            paymentType:0,
+            totalCatPerEvent:0,
+
         }
 
-        //getting the all the userActive information
-       
+        dashboard.totalEventPerOrganiser = await EventModel.aggregate([
+          {
+            $group: {
+              _id: '$organiserId',
+              totalEvents: { $sum: 1 }
+            }
+          },
+          {
+            $lookup: {
+              from: 'UserModel',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $project: {
+              username: '$user.username',
+              totalEvents: 1
+            }
+          }
+        ]);
+        
+
+        dashboard.totalCatPerEvent = await EventModel.aggregate([
+          {
+            $group: {
+              _id: '$categoryId',
+              totalEvents: { $sum: 1 }
+            }
+          },
+          {
+            $lookup: {
+              from: 'CategoryModel',
+              localField: '_id',
+              foreignField: '_id',
+              as: 'category'
+            }
+          },
+          {
+            $project: {
+              categoryName: '$category.name',
+              totalEvents: 1
+            }
+          }
+        ]);
+
+        dashboard.paymentType = await PaymentModel.aggregate([
+          {
+            $group: {
+              _id: '$paymentType',
+              totalAmount: { $sum: '$amount' }
+            }
+          }
+        ]);
+        
+        
+
+        dashboard.revenuePerUser = await BookingModel.aggregate([
+          {
+            $lookup: {
+              from: 'UserModel',
+              localField: 'userId',
+              foreignField: '_id',
+              as: 'user'
+            }
+          },
+          {
+            $group: {
+              _id: '$user.username',
+              totalRevenue: { $sum: '$totalAmount' }
+            }
+          }
+        ]);
+               
   
       const [activeUsersData, notActiveUsersData] = await Promise.all([
         UserModel.aggregate([
@@ -138,6 +219,14 @@ adminCltr.getAggregate = async (req, res) => {
 
       dashboard.popularEvent = await EventModel.aggregate([
         {
+          $match: {
+              eventStartDateTime: { $lt: new Date() }, // Event has started
+              eventEndDateTime: { $gt: new Date() }, // Event has not ended yet
+              isApproved:true
+
+          }
+      },
+        {
             $unwind: "$ticketType" 
         },
         {
@@ -153,7 +242,7 @@ adminCltr.getAggregate = async (req, res) => {
             $sort: { ticketsSold: -1 }
         },
         {
-            $limit: 10
+            $limit: 5
         }
     ])
 
@@ -187,9 +276,45 @@ adminCltr.getAggregate = async (req, res) => {
         }
     ])
 
+    dashboard.totalBooking = await BookingModel.aggregate([
+      {
+        $lookup: {
+          from: 'EventModel',
+          localField: 'eventId',
+          foreignField: '_id',
+          as: 'event'
+        }
+      },
+      {
+        $group: {
+          _id: '$event.title',
+          totalBookings: { $sum: 1 }
+        }
+      }
+    ]);
 
-
-
+    dashboard.avgPerCat = await EventModel.aggregate([
+      {
+        $group: {
+          _id: '$categoryId',
+          averageTicketPrice: { $avg: '$ticketType.ticketPrice' }
+        }
+      },
+      {
+        $lookup: {
+          from: 'CategoryModel',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'category'
+        }
+      },
+      {
+        $project: {
+          categoryName: '$category.name',
+          averageTicketPrice: 1
+        }
+      }
+    ]);
 
       return res.json(dashboard);
     } catch (err) {
